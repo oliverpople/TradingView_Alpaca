@@ -59,7 +59,8 @@ def webhook():
                 buying_power = float(account.cash)
                 logger.info(f"Available buying power: ${buying_power}")
 
-                if buying_power > 0:  # Check if there is any cash available
+                # Check if buying power is sufficient
+                if buying_power >= 10:  # Minimum order amount
                     # Submit market order using all available cash
                     order = api.submit_order(
                         symbol=ticker,
@@ -69,28 +70,29 @@ def webhook():
                         time_in_force='gtc'
                     )
                     logger.info(f"Buy order submitted: {order}")
-                    
-                    # Wait briefly for order to process
-                    time.sleep(2)
-                    
-                    # Check order status
-                    filled_order = api.get_order(order.id)
-                    logger.info(f"Order status: {filled_order.status}, filled quantity: {filled_order.filled_qty}")
-                    
-                    if filled_order.status == 'filled':
-                        return jsonify({
-                            "message": "Buy order executed successfully",
-                            "order_id": order.id,
-                            "amount": buying_power,
-                            "filled_qty": filled_order.filled_qty,
-                            "filled_price": filled_order.filled_avg_price,
-                            "ticker": ticker
-                        }), 200
-                    else:
-                        logger.error(f"Order not filled. Status: {filled_order.status}")
-                        return jsonify({"error": f"Order not filled. Status: {filled_order.status}"}), 500
                 else:
-                    return jsonify({"error": "Insufficient funds"}), 400
+                    logger.error("Insufficient funds for minimum order amount of $10")
+                    return jsonify({"error": "Insufficient funds for minimum order amount of $10"}), 400
+
+                # Wait briefly for order to process
+                time.sleep(2)
+                
+                # Check order status
+                filled_order = api.get_order(order.id)
+                logger.info(f"Order status: {filled_order.status}, filled quantity: {filled_order.filled_qty}")
+                
+                if filled_order.status == 'filled':
+                    return jsonify({
+                        "message": "Buy order executed successfully",
+                        "order_id": order.id,
+                        "amount": buying_power,
+                        "filled_qty": filled_order.filled_qty,
+                        "filled_price": filled_order.filled_avg_price,
+                        "ticker": ticker
+                    }), 200
+                else:
+                    logger.error(f"Order not filled. Status: {filled_order.status}")
+                    return jsonify({"error": f"Order not filled. Status: {filled_order.status}"}), 500
 
             except Exception as e:
                 logger.error(f"Error executing buy order: {str(e)}")
@@ -112,7 +114,7 @@ def webhook():
                 # Submit order to sell entire position using notional amount for better fractional handling
                 order = api.submit_order(
                     symbol=ticker,
-                    notional=float(position.market_value),  # Sell entire position value
+                    notional=round(float(position.market_value), 2),  # Round to 2 decimal places
                     side='sell',
                     type='market',
                     time_in_force='gtc'
