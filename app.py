@@ -56,15 +56,15 @@ def webhook():
 
         if action == 'Buy':
             try:
-                # Get current quote
-                quote = api.get_latest_quote(ticker)
-                if not quote:
+                # Get current trade price
+                trade = api.get_latest_trade(ticker)
+                if not trade:
                     logger.error(f"No price data available for {ticker}")
                     return jsonify({"error": f"No price data available for {ticker}"}), 400
                 
-                # Use ask price for buying
-                asset_price = float(quote.ask_price)
-                logger.info(f"Current ask price for {ticker}: {asset_price}")
+                # Use trade price
+                asset_price = float(trade.price)
+                logger.info(f"Current price for {ticker}: {asset_price}")
 
                 # Calculate position size (use 95% of buying power to account for fees)
                 buying_power = float(account.cash) * 0.95
