@@ -29,42 +29,28 @@ def get_latest_price(symbol):
     """Get latest price for a symbol"""
     try:
         if '/' in symbol:  # This is a crypto pair
-            # For crypto, we need to use a different endpoint and format
-            base, quote = symbol.split('/')
-            symbol = f"{base}{quote}"  # Convert BTC/USD to BTCUSD
+            # For crypto, remove the slash
+            symbol = symbol.replace('/', '')
             
             try:
-                # Try to get latest trade
-                trade = api.get_latest_crypto_trade(symbol)
-                if trade:
-                    return float(trade.price)
+                # Get latest trade data
+                resp = api.get_latest_trade(symbol)
+                if resp and hasattr(resp, 'price'):
+                    return float(resp.price)
             except Exception as e:
-                logger.error(f"Error getting crypto trade: {e}")
+                logger.error(f"Error getting latest trade: {e}")
                 
                 try:
-                    # Fallback to latest quote
-                    quote = api.get_latest_crypto_quote(symbol)
-                    if quote:
-                        return float(quote.ask_price)  # Use ask price for buying
+                    # Fallback to barset
+                    barset = api.get_barset(symbol, 'minute', limit=1)
+                    if symbol in barset and len(barset[symbol]) > 0:
+                        return float(barset[symbol][0].c)
                 except Exception as e:
-                    logger.error(f"Error getting crypto quote: {e}")
-                    
-                    try:
-                        # Final fallback to crypto bars
-                        bars = api.get_crypto_bars(
-                            symbol,
-                            'minute',
-                            limit=1
-                        ).df
-                        if not bars.empty:
-                            return float(bars['close'].iloc[-1])
-                    except Exception as e:
-                        logger.error(f"Error getting crypto bars: {e}")
+                    logger.error(f"Error getting barset: {e}")
             
         else:  # This is a stock
-            # For stocks, use barset
             barset = api.get_barset(symbol, 'minute', limit=1)
-            if symbol in barset:
+            if symbol in barset and len(barset[symbol]) > 0:
                 return float(barset[symbol][0].c)
         
         logger.error(f"No price data available for {symbol}")
