@@ -23,6 +23,14 @@ api = tradeapi.REST(
     api_version='v2'
 )
 
+# Create a separate data API client
+data_api = tradeapi.REST(
+    os.getenv('ALPACA_API_KEY'),
+    os.getenv('ALPACA_SECRET_KEY'),
+    'https://data.alpaca.markets',
+    api_version='v2'
+)
+
 @app.route('/')
 def home():
     return "TradingView Webhook Server is running!"
@@ -56,14 +64,14 @@ def webhook():
 
         if action == 'Buy':
             try:
-                # Get current trade price
-                trade = api.get_latest_trade(ticker)
-                if not trade:
+                # Get current trade price using the data API
+                last_trade = data_api.get_last_trade(ticker)
+                if not last_trade:
                     logger.error(f"No price data available for {ticker}")
                     return jsonify({"error": f"No price data available for {ticker}"}), 400
                 
-                # Use trade price
-                asset_price = float(trade.price)
+                # Use last trade price
+                asset_price = float(last_trade.price)
                 logger.info(f"Current price for {ticker}: {asset_price}")
 
                 # Calculate position size (use 95% of buying power to account for fees)
