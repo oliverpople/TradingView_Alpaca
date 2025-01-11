@@ -27,7 +27,7 @@ api = tradeapi.REST(
 data_api = tradeapi.REST(
     os.getenv('ALPACA_API_KEY'),
     os.getenv('ALPACA_SECRET_KEY'),
-    'https://data.alpaca.markets',
+    'https://data.alpaca.markets/v2',
     api_version='v2'
 )
 
@@ -65,13 +65,13 @@ def webhook():
         if action == 'Buy':
             try:
                 # Get current trade price using the data API
-                last_trade = data_api.get_last_trade(ticker)
+                last_trade = data_api.get_latest_trade(ticker)
                 if not last_trade:
                     logger.error(f"No price data available for {ticker}")
                     return jsonify({"error": f"No price data available for {ticker}"}), 400
                 
                 # Use last trade price
-                asset_price = float(last_trade.price)
+                asset_price = float(last_trade.p)
                 logger.info(f"Current price for {ticker}: {asset_price}")
 
                 # Calculate position size (use 95% of buying power to account for fees)
