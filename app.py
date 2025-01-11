@@ -3,6 +3,7 @@ import alpaca_trade_api as tradeapi
 import os
 from dotenv import load_dotenv
 import logging
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -48,6 +49,10 @@ def webhook():
             logger.error(f"Missing required fields. Received: {data}")
             return jsonify({"error": "Missing action or ticker"}), 400
 
+        # Ensure proper crypto ticker format (BTC/USD -> BTCUSD)
+        if '/' in ticker:
+            ticker = ticker.replace('/', '')
+        
         logger.info(f"Processing {action} order for {ticker}")
 
         if action == 'Buy':
@@ -58,21 +63,35 @@ def webhook():
                 logger.info(f"Available buying power: ${buying_power}")
 
                 if buying_power >= TRADE_AMOUNT:
-                    # Submit market order using dollar amount
+                    # Submit market order using dollar amount (supports fractional shares)
                     order = api.submit_order(
                         symbol=ticker,
-                        notional=TRADE_AMOUNT,  # Use fixed dollar amount
+                        notional=TRADE_AMOUNT,  # Use fixed dollar amount for fractional shares
                         side='buy',
                         type='market',
                         time_in_force='gtc'
                     )
                     logger.info(f"Buy order submitted: {order}")
-                    return jsonify({
-                        "message": "Buy order executed successfully",
-                        "order_id": order.id,
-                        "amount": TRADE_AMOUNT,
-                        "ticker": ticker
-                    }), 200
+                    
+                    # Wait briefly for order to process
+                    time.sleep(2)
+                    
+                    # Check order status
+                    filled_order = api.get_order(order.id)
+                    logger.info(f"Order status: {filled_order.status}, filled quantity: {filled_order.filled_qty}")
+                    
+                    if filled_order.status == 'filled':
+                        return jsonify({
+                            "message": "Buy order executed successfully",
+                            "order_id": order.id,
+                            "amount": TRADE_AMOUNT,
+                            "filled_qty": filled_order.filled_qty,
+                            "filled_price": filled_order.filled_avg_price,
+                            "ticker": ticker
+                        }), 200
+                    else:
+                        logger.error(f"Order not filled. Status: {filled_order.status}")
+                        return jsonify({"error": f"Order not filled. Status: {filled_order.status}"}), 500
                 else:
                     return jsonify({"error": "Insufficient funds"}), 400
 
@@ -82,24 +101,45 @@ def webhook():
 
         elif action == 'Sell':
             try:
-                # Get current position
-                position = api.get_position(ticker)
+                try:
+                    # Get current position
+                    position = api.get_position(ticker)
+                    logger.info(f"Current position: {position.qty} {ticker} at market value ${position.market_value}")
+                except Exception as pos_e:
+                    logger.error(f"Error getting position: {str(pos_e)}")
+                    return jsonify({"error": "No position found to sell"}), 404
                 
-                # Submit order to sell entire position
+                if float(position.qty) <= 0:
+                    return jsonify({"error": "No position to sell"}), 400
+                
+                # Submit order to sell entire position using notional amount for better fractional handling
                 order = api.submit_order(
                     symbol=ticker,
-                    qty=position.qty,
+                    notional=float(position.market_value),  # Sell entire position value
                     side='sell',
                     type='market',
                     time_in_force='gtc'
                 )
                 logger.info(f"Sell order submitted: {order}")
-                return jsonify({
-                    "message": "Sell order executed successfully",
-                    "order_id": order.id,
-                    "quantity": position.qty,
-                    "ticker": ticker
-                }), 200
+                
+                # Wait briefly for order to process
+                time.sleep(2)
+                
+                # Check order status
+                filled_order = api.get_order(order.id)
+                logger.info(f"Order status: {filled_order.status}, filled quantity: {filled_order.filled_qty}")
+                
+                if filled_order.status == 'filled':
+                    return jsonify({
+                        "message": "Sell order executed successfully",
+                        "order_id": order.id,
+                        "quantity": filled_order.filled_qty,
+                        "filled_price": filled_order.filled_avg_price,
+                        "ticker": ticker
+                    }), 200
+                else:
+                    logger.error(f"Order not filled. Status: {filled_order.status}")
+                    return jsonify({"error": f"Order not filled. Status: {filled_order.status}"}), 500
 
             except Exception as e:
                 logger.error(f"Error executing sell order: {str(e)}")
