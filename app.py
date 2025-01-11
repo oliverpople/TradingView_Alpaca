@@ -28,10 +28,20 @@ api = tradeapi.REST(
 def get_latest_price(symbol):
     """Get latest price for a symbol"""
     try:
-        # Get stock data
-        barset = api.get_barset(symbol, 'minute', limit=1)
-        if symbol in barset:
-            return float(barset[symbol][0].c)
+        if '/' in symbol:  # This is a crypto pair
+            # For crypto, we need to use a different endpoint
+            bars = api.get_crypto_bars(
+                symbol,
+                'minute',
+                limit=1
+            ).df
+            if not bars.empty:
+                return float(bars['close'].iloc[-1])
+        else:  # This is a stock
+            # For stocks, use barset
+            barset = api.get_barset(symbol, 'minute', limit=1)
+            if symbol in barset:
+                return float(barset[symbol][0].c)
         
         logger.error(f"No price data available for {symbol}")
         return None
@@ -63,10 +73,18 @@ def webhook():
 
         logger.info(f"Processing {action} order for {ticker}")
 
+        # Verify account connection first
+        try:
+            account = api.get_account()
+            logger.info(f"Account status: {account.status}")
+            if account.status != 'ACTIVE':
+                return jsonify({"error": "Account is not active"}), 400
+        except Exception as e:
+            logger.error(f"Failed to connect to Alpaca API: {str(e)}")
+            return jsonify({"error": "Failed to connect to trading account"}), 500
+
         if action == 'Buy':
             try:
-                # Get account info
-                account = api.get_account()
                 buying_power = float(account.cash)
                 logger.info(f"Available buying power: ${buying_power}")
 
@@ -80,7 +98,7 @@ def webhook():
 
                     # Calculate maximum shares (use 95% of buying power)
                     max_shares = int(buying_power * 0.95 / current_price)
-                    logger.info(f"Attempting to buy {max_shares} shares of {ticker}")
+                    logger.info(f"Attempting to buy {max_shares} shares/units of {ticker}")
 
                     if max_shares > 0:
                         # Submit market order
