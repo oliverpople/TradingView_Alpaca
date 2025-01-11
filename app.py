@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 import logging
 
-# Configure logging with more detail
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -15,19 +15,11 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Alpaca API setup using environment variables
+# Alpaca API setup
 api = tradeapi.REST(
     os.getenv('ALPACA_API_KEY'),
     os.getenv('ALPACA_SECRET_KEY'),
     'https://paper-api.alpaca.markets',
-    api_version='v2'
-)
-
-# Create a separate data API client
-data_api = tradeapi.REST(
-    os.getenv('ALPACA_API_KEY'),
-    os.getenv('ALPACA_SECRET_KEY'),
-    'https://data.alpaca.markets/v2',
     api_version='v2'
 )
 
@@ -54,46 +46,27 @@ def webhook():
 
         logger.info(f"Processing {action} order for {ticker}")
 
-        # Verify API connection
-        try:
-            account = api.get_account()
-            logger.info(f"Account status: {account.status}")
-        except Exception as e:
-            logger.error(f"Failed to connect to Alpaca API: {str(e)}")
-            return jsonify({"error": "Failed to connect to trading account"}), 500
-
         if action == 'Buy':
             try:
-                # Get current trade price using the data API
-                snapshot = data_api.get_snapshot(ticker)
-                if not snapshot:
-                    logger.error(f"No price data available for {ticker}")
-                    return jsonify({"error": f"No price data available for {ticker}"}), 400
-                
-                # Use latest trade price
-                asset_price = float(snapshot.latest_trade.price)
-                logger.info(f"Current price for {ticker}: {asset_price}")
-
-                # Calculate position size (use 95% of buying power to account for fees)
-                buying_power = float(account.cash) * 0.95
+                # Get account info
+                account = api.get_account()
+                buying_power = float(account.cash)
                 logger.info(f"Available buying power: {buying_power}")
 
-                max_contracts = int(buying_power / asset_price)
-                
-                if max_contracts > 0:
-                    # Submit the order
+                if buying_power > 0:
+                    # Submit market order in dollars instead of shares
                     order = api.submit_order(
                         symbol=ticker,
-                        qty=max_contracts,
+                        notional=buying_power,  # Use all available cash
                         side='buy',
                         type='market',
                         time_in_force='gtc'
                     )
                     logger.info(f"Buy order submitted: {order}")
                     return jsonify({
-                        "message": "Trade executed successfully",
+                        "message": "Buy order executed successfully",
                         "order_id": order.id,
-                        "quantity": max_contracts,
+                        "amount": buying_power,
                         "ticker": ticker
                     }), 200
                 else:
@@ -105,26 +78,24 @@ def webhook():
 
         elif action == 'Sell':
             try:
+                # Get current position
                 position = api.get_position(ticker)
-                qty_to_sell = int(position.qty)
-
-                if qty_to_sell > 0:
-                    order = api.submit_order(
-                        symbol=ticker,
-                        qty=qty_to_sell,
-                        side='sell',
-                        type='market',
-                        time_in_force='gtc'
-                    )
-                    logger.info(f"Sell order submitted: {order}")
-                    return jsonify({
-                        "message": "Trade executed successfully",
-                        "order_id": order.id,
-                        "quantity": qty_to_sell,
-                        "ticker": ticker
-                    }), 200
-                else:
-                    return jsonify({"error": "No position to sell"}), 400
+                
+                # Submit order to sell entire position
+                order = api.submit_order(
+                    symbol=ticker,
+                    qty=position.qty,
+                    side='sell',
+                    type='market',
+                    time_in_force='gtc'
+                )
+                logger.info(f"Sell order submitted: {order}")
+                return jsonify({
+                    "message": "Sell order executed successfully",
+                    "order_id": order.id,
+                    "quantity": position.qty,
+                    "ticker": ticker
+                }), 200
 
             except Exception as e:
                 logger.error(f"Error executing sell order: {str(e)}")
