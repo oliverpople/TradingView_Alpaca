@@ -3,6 +3,7 @@ import alpaca_trade_api as tradeapi
 import os
 from dotenv import load_dotenv
 import logging
+from datetime import datetime, timedelta
 
 # Configure logging
 logging.basicConfig(
@@ -23,6 +24,30 @@ api = tradeapi.REST(
     'https://paper-api.alpaca.markets',
     api_version='v2'
 )
+
+def get_latest_price(symbol):
+    """Get latest price for a symbol using appropriate method"""
+    try:
+        # Try to get barset (for stocks)
+        barset = api.get_barset(symbol, 'minute', limit=1)
+        if barset and symbol in barset:
+            return float(barset[symbol][0].c)
+        
+        logger.info("Could not get stock bars, trying crypto bars...")
+        
+        # If barset doesn't work, try crypto bars
+        end = datetime.now()
+        start = end - timedelta(minutes=1)
+        bars = api.get_crypto_bars(symbol, 'minute', start=start.isoformat(), end=end.isoformat()).df
+        if not bars.empty:
+            return float(bars['close'].iloc[-1])
+            
+        logger.error(f"No price data available for {symbol}")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error getting price for {symbol}: {e}")
+        return None
 
 @app.route('/')
 def home():
@@ -55,13 +80,11 @@ def webhook():
                 logger.info(f"Available buying power: ${buying_power}")
 
                 if buying_power > 0:
-                    # Get current price using bars
-                    bars = api.get_bars(ticker, '1Min', limit=1)
-                    if not bars:
-                        logger.error(f"No price data available for {ticker}")
-                        return jsonify({"error": f"No price data available for {ticker}"}), 400
+                    # Get current price
+                    current_price = get_latest_price(ticker)
+                    if not current_price:
+                        return jsonify({"error": f"Could not get price for {ticker}"}), 400
                     
-                    current_price = float(bars[0].c)  # Use closing price
                     logger.info(f"Current price for {ticker}: ${current_price}")
 
                     # Calculate maximum shares (use 95% of buying power)
