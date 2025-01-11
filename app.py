@@ -24,6 +24,9 @@ api = tradeapi.REST(
     api_version='v2'
 )
 
+# Fixed amount to trade (in dollars)
+TRADE_AMOUNT = 100.00
+
 @app.route('/')
 def home():
     return "TradingView Webhook Server is running!"
@@ -54,11 +57,11 @@ def webhook():
                 buying_power = float(account.cash)
                 logger.info(f"Available buying power: ${buying_power}")
 
-                if buying_power > 0:
-                    # Submit market order for 1 share to test
+                if buying_power >= TRADE_AMOUNT:
+                    # Submit market order using dollar amount
                     order = api.submit_order(
                         symbol=ticker,
-                        qty=1,  # Start with 1 share
+                        notional=TRADE_AMOUNT,  # Use fixed dollar amount
                         side='buy',
                         type='market',
                         time_in_force='gtc'
@@ -67,6 +70,7 @@ def webhook():
                     return jsonify({
                         "message": "Buy order executed successfully",
                         "order_id": order.id,
+                        "amount": TRADE_AMOUNT,
                         "ticker": ticker
                     }), 200
                 else:
