@@ -1,10 +1,18 @@
 from flask import Flask, request, jsonify
 import alpaca_trade_api as tradeapi
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables
 
 app = Flask(__name__)
 
-# Alpaca API setup
-api = tradeapi.REST('PKNOCJC0383G8IQMI1X6', 'ZkA1uYK4BjPUIecrejfLS6LkS92IUOjxJTui44s8', 'https://paper-api.alpaca.markets/v2')
+# Alpaca API setup using environment variables
+api = tradeapi.REST(
+    os.getenv('ALPACA_API_KEY'),
+    os.getenv('ALPACA_SECRET_KEY'),
+    os.getenv('ALPACA_API_URL', 'https://paper-api.alpaca.markets/v2')
+)
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
