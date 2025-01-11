@@ -29,12 +29,19 @@ def get_latest_price(symbol):
     """Get latest price for a symbol"""
     try:
         if '/' in symbol:  # This is a crypto pair
-            # For crypto, we need to use a different endpoint
+            # For crypto, we need to use BTCUSD format instead of BTC/USD
+            symbol = symbol.replace('/', '')
+            # Get current time in UTC
+            end = datetime.utcnow()
+            start = end - timedelta(minutes=1)
+            
             bars = api.get_crypto_bars(
                 symbol,
                 'minute',
-                limit=1
+                start=start.isoformat(),
+                end=end.isoformat()
             ).df
+            
             if not bars.empty:
                 return float(bars['close'].iloc[-1])
         else:  # This is a stock
