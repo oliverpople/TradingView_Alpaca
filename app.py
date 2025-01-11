@@ -7,7 +7,8 @@ import logging
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s.%(msecs)03d - %(message)s',
+    datefmt='%H:%M:%S'
 )
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Alpaca API setup
+# Initialize Alpaca API
 api = tradeapi.REST(
     os.getenv('ALPACA_API_KEY'),
     os.getenv('ALPACA_SECRET_KEY'),
@@ -51,16 +52,20 @@ def webhook():
                 # Get account info
                 account = api.get_account()
                 buying_power = float(account.cash)
-                logger.info(f"Available buying power: {buying_power}")
+                logger.info(f"Available buying power: ${buying_power}")
 
                 if buying_power > 0:
-                    # Get current price using last trade
-                    last_trade = api.get_last_quote(ticker)  # Updated from get_last_trade to get_last_quote
-                    current_price = float(last_trade.askprice)  # Use the ask price for the most accurate buy price
-                    logger.info(f"Current price for {ticker}: {current_price}")
+                    # Get current price using bars
+                    bars = api.get_bars(ticker, '1Min', limit=1)
+                    if not bars:
+                        logger.error(f"No price data available for {ticker}")
+                        return jsonify({"error": f"No price data available for {ticker}"}), 400
+                    
+                    current_price = float(bars[0].c)  # Use closing price
+                    logger.info(f"Current price for {ticker}: ${current_price}")
 
-                    # Calculate maximum shares we can buy (leave some margin for price movement)
-                    max_shares = int(buying_power / current_price * 0.95)  # Using 95% of buying power
+                    # Calculate maximum shares (use 95% of buying power)
+                    max_shares = int(buying_power * 0.95 / current_price)
                     logger.info(f"Attempting to buy {max_shares} shares of {ticker}")
 
                     if max_shares > 0:
