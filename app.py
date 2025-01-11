@@ -54,21 +54,34 @@ def webhook():
                 logger.info(f"Available buying power: {buying_power}")
 
                 if buying_power > 0:
-                    # Submit market order in dollars instead of shares
-                    order = api.submit_order(
-                        symbol=ticker,
-                        notional=buying_power,  # Use all available cash
-                        side='buy',
-                        type='market',
-                        time_in_force='gtc'
-                    )
-                    logger.info(f"Buy order submitted: {order}")
-                    return jsonify({
-                        "message": "Buy order executed successfully",
-                        "order_id": order.id,
-                        "amount": buying_power,
-                        "ticker": ticker
-                    }), 200
+                    # Get current price
+                    last_quote = api.get_last_quote(ticker)
+                    current_price = float(last_quote.askprice)
+                    logger.info(f"Current price for {ticker}: {current_price}")
+
+                    # Calculate maximum shares we can buy (leave some margin for price movement)
+                    max_shares = int(buying_power / current_price * 0.95)  # Using 95% of buying power
+                    logger.info(f"Attempting to buy {max_shares} shares of {ticker}")
+
+                    if max_shares > 0:
+                        # Submit market order
+                        order = api.submit_order(
+                            symbol=ticker,
+                            qty=max_shares,
+                            side='buy',
+                            type='market',
+                            time_in_force='gtc'
+                        )
+                        logger.info(f"Buy order submitted: {order}")
+                        return jsonify({
+                            "message": "Buy order executed successfully",
+                            "order_id": order.id,
+                            "shares": max_shares,
+                            "estimated_cost": max_shares * current_price,
+                            "ticker": ticker
+                        }), 200
+                    else:
+                        return jsonify({"error": "Insufficient funds for minimum order"}), 400
                 else:
                     return jsonify({"error": "Insufficient funds"}), 400
 
