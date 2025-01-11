@@ -100,21 +100,21 @@ def webhook():
 
         elif action == 'Sell':
             try:
-                try:
-                    # Get current position
-                    position = api.get_position(ticker)
-                    logger.info(f"Current position: {position.qty} {ticker} at market value ${position.market_value}")
-                except Exception as pos_e:
-                    logger.error(f"Error getting position: {str(pos_e)}")
-                    return jsonify({"error": "No position found to sell"}), 404
-                
+                # Get current position
+                position = api.get_position(ticker)
+                logger.info(f"Current position: {position.qty} {ticker} at market value ${position.market_value}")
+
                 if float(position.qty) <= 0:
+                    logger.error("No position to sell")
                     return jsonify({"error": "No position to sell"}), 400
-                
-                # Submit order to sell entire position using notional amount for better fractional handling
+
+                # Use the available quantity for the sell order
+                available_qty = float(position.qty)
+
+                # Submit order to sell entire position using available quantity
                 order = api.submit_order(
                     symbol=ticker,
-                    notional=round(float(position.market_value), 2),  # Round to 2 decimal places
+                    qty=round(available_qty, 6),  # Round to 6 decimal places for BTC
                     side='sell',
                     type='market',
                     time_in_force='gtc'
