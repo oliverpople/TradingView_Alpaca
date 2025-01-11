@@ -19,7 +19,7 @@ app = Flask(__name__)
 api = tradeapi.REST(
     os.getenv('ALPACA_API_KEY'),
     os.getenv('ALPACA_SECRET_KEY'),
-    os.getenv('ALPACA_API_URL', 'https://paper-api.alpaca.markets/v2'),
+    'https://paper-api.alpaca.markets',
     api_version='v2'
 )
 
