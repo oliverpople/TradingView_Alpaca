@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 import alpaca_trade_api as tradeapi
+from alpaca_trade_api.rest import TimeFrame
 import os
 from dotenv import load_dotenv
 import logging
@@ -28,23 +29,43 @@ api = tradeapi.REST(
 def get_latest_price(symbol):
     """Get latest price for a symbol using appropriate method"""
     try:
-        # Try to get barset (for stocks)
-        barset = api.get_barset(symbol, 'minute', limit=1)
-        if barset and symbol in barset:
-            return float(barset[symbol][0].c)
-        
-        logger.info("Could not get stock bars, trying crypto bars...")
-        
-        # If barset doesn't work, try crypto bars
-        end = datetime.now()
-        start = end - timedelta(minutes=1)
-        bars = api.get_crypto_bars(symbol, 'minute', start=start.isoformat(), end=end.isoformat()).df
-        if not bars.empty:
-            return float(bars['close'].iloc[-1])
+        # Get the current time in UTC
+        end = datetime.utcnow()
+        start = end - timedelta(minutes=5)  # Get last 5 minutes of data
+
+        # Try to get stock data
+        try:
+            bars = api.get_bars(
+                symbol,
+                TimeFrame.Minute,
+                start=start.strftime('%Y-%m-%d'),
+                end=end.strftime('%Y-%m-%d'),
+                limit=1
+            ).df
             
+            if not bars.empty:
+                return float(bars['close'].iloc[-1])
+        except Exception as e:
+            logger.info(f"Could not get stock data: {e}, trying crypto...")
+
+        # Try crypto data if stock data fails
+        try:
+            crypto_bars = api.get_crypto_bars(
+                symbol,
+                TimeFrame.Minute,
+                start=start.strftime('%Y-%m-%d'),
+                end=end.strftime('%Y-%m-%d'),
+                limit=1
+            ).df
+            
+            if not crypto_bars.empty:
+                return float(crypto_bars['close'].iloc[-1])
+        except Exception as e:
+            logger.info(f"Could not get crypto data: {e}")
+
         logger.error(f"No price data available for {symbol}")
         return None
-        
+
     except Exception as e:
         logger.error(f"Error getting price for {symbol}: {e}")
         return None
