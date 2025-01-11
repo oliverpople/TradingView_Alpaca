@@ -29,21 +29,38 @@ def get_latest_price(symbol):
     """Get latest price for a symbol"""
     try:
         if '/' in symbol:  # This is a crypto pair
-            # For crypto, we need to use BTCUSD format instead of BTC/USD
-            symbol = symbol.replace('/', '')
-            # Get current time in UTC
-            end = datetime.utcnow()
-            start = end - timedelta(minutes=1)
+            # For crypto, we need to use a different endpoint and format
+            base, quote = symbol.split('/')
+            symbol = f"{base}{quote}"  # Convert BTC/USD to BTCUSD
             
-            bars = api.get_crypto_bars(
-                symbol,
-                'minute',
-                start=start.isoformat(),
-                end=end.isoformat()
-            ).df
+            try:
+                # Try to get latest trade
+                trade = api.get_latest_crypto_trade(symbol)
+                if trade:
+                    return float(trade.price)
+            except Exception as e:
+                logger.error(f"Error getting crypto trade: {e}")
+                
+                try:
+                    # Fallback to latest quote
+                    quote = api.get_latest_crypto_quote(symbol)
+                    if quote:
+                        return float(quote.ask_price)  # Use ask price for buying
+                except Exception as e:
+                    logger.error(f"Error getting crypto quote: {e}")
+                    
+                    try:
+                        # Final fallback to crypto bars
+                        bars = api.get_crypto_bars(
+                            symbol,
+                            'minute',
+                            limit=1
+                        ).df
+                        if not bars.empty:
+                            return float(bars['close'].iloc[-1])
+                    except Exception as e:
+                        logger.error(f"Error getting crypto bars: {e}")
             
-            if not bars.empty:
-                return float(bars['close'].iloc[-1])
         else:  # This is a stock
             # For stocks, use barset
             barset = api.get_barset(symbol, 'minute', limit=1)
@@ -103,12 +120,24 @@ def webhook():
                     
                     logger.info(f"Current price for {ticker}: ${current_price}")
 
-                    # Calculate maximum shares (use 95% of buying power)
-                    max_shares = int(buying_power * 0.95 / current_price)
-                    logger.info(f"Attempting to buy {max_shares} shares/units of {ticker}")
-
-                    if max_shares > 0:
-                        # Submit market order
+                    # For crypto, we need to use notional amount
+                    if '/' in ticker:
+                        # Use 95% of buying power for crypto
+                        notional = buying_power * 0.95
+                        logger.info(f"Attempting to buy ${notional} worth of {ticker}")
+                        
+                        order = api.submit_order(
+                            symbol=ticker.replace('/', ''),  # Remove slash for order
+                            notional=notional,  # Use notional for crypto
+                            side='buy',
+                            type='market',
+                            time_in_force='gtc'
+                        )
+                    else:
+                        # Calculate maximum shares for stocks
+                        max_shares = int(buying_power * 0.95 / current_price)
+                        logger.info(f"Attempting to buy {max_shares} shares of {ticker}")
+                        
                         order = api.submit_order(
                             symbol=ticker,
                             qty=max_shares,
@@ -116,16 +145,13 @@ def webhook():
                             type='market',
                             time_in_force='gtc'
                         )
-                        logger.info(f"Buy order submitted: {order}")
-                        return jsonify({
-                            "message": "Buy order executed successfully",
-                            "order_id": order.id,
-                            "shares": max_shares,
-                            "estimated_cost": max_shares * current_price,
-                            "ticker": ticker
-                        }), 200
-                    else:
-                        return jsonify({"error": "Insufficient funds for minimum order"}), 400
+
+                    logger.info(f"Buy order submitted: {order}")
+                    return jsonify({
+                        "message": "Buy order executed successfully",
+                        "order_id": order.id,
+                        "ticker": ticker
+                    }), 200
                 else:
                     return jsonify({"error": "Insufficient funds"}), 400
 
