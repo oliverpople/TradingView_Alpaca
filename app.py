@@ -54,9 +54,9 @@ def webhook():
                 logger.info(f"Available buying power: {buying_power}")
 
                 if buying_power > 0:
-                    # Get current price
-                    last_quote = api.get_last_quote(ticker)
-                    current_price = float(last_quote.askprice)
+                    # Get current price using last trade
+                    last_trade = api.get_last_trade(ticker)
+                    current_price = float(last_trade.price)
                     logger.info(f"Current price for {ticker}: {current_price}")
 
                     # Calculate maximum shares we can buy (leave some margin for price movement)
