@@ -3,7 +3,6 @@ import alpaca_trade_api as tradeapi
 import os
 from dotenv import load_dotenv
 import logging
-from datetime import datetime, timedelta
 
 # Configure logging
 logging.basicConfig(
@@ -24,41 +23,6 @@ api = tradeapi.REST(
     'https://paper-api.alpaca.markets',
     api_version='v2'
 )
-
-def get_latest_price(symbol):
-    """Get latest price for a symbol"""
-    try:
-        if '/' in symbol:  # This is a crypto pair
-            # For crypto, remove the slash
-            symbol = symbol.replace('/', '')
-            
-            try:
-                # Get latest trade data
-                resp = api.get_latest_trade(symbol)
-                if resp and hasattr(resp, 'price'):
-                    return float(resp.price)
-            except Exception as e:
-                logger.error(f"Error getting latest trade: {e}")
-                
-                try:
-                    # Fallback to barset
-                    barset = api.get_barset(symbol, 'minute', limit=1)
-                    if symbol in barset and len(barset[symbol]) > 0:
-                        return float(barset[symbol][0].c)
-                except Exception as e:
-                    logger.error(f"Error getting barset: {e}")
-            
-        else:  # This is a stock
-            barset = api.get_barset(symbol, 'minute', limit=1)
-            if symbol in barset and len(barset[symbol]) > 0:
-                return float(barset[symbol][0].c)
-        
-        logger.error(f"No price data available for {symbol}")
-        return None
-        
-    except Exception as e:
-        logger.error(f"Error getting price for {symbol}: {e}")
-        return None
 
 @app.route('/')
 def home():
@@ -83,55 +47,22 @@ def webhook():
 
         logger.info(f"Processing {action} order for {ticker}")
 
-        # Verify account connection first
-        try:
-            account = api.get_account()
-            logger.info(f"Account status: {account.status}")
-            if account.status != 'ACTIVE':
-                return jsonify({"error": "Account is not active"}), 400
-        except Exception as e:
-            logger.error(f"Failed to connect to Alpaca API: {str(e)}")
-            return jsonify({"error": "Failed to connect to trading account"}), 500
-
         if action == 'Buy':
             try:
+                # Get account info
+                account = api.get_account()
                 buying_power = float(account.cash)
                 logger.info(f"Available buying power: ${buying_power}")
 
                 if buying_power > 0:
-                    # Get current price
-                    current_price = get_latest_price(ticker)
-                    if not current_price:
-                        return jsonify({"error": f"Could not get price for {ticker}"}), 400
-                    
-                    logger.info(f"Current price for {ticker}: ${current_price}")
-
-                    # For crypto, we need to use notional amount
-                    if '/' in ticker:
-                        # Use 95% of buying power for crypto
-                        notional = buying_power * 0.95
-                        logger.info(f"Attempting to buy ${notional} worth of {ticker}")
-                        
-                        order = api.submit_order(
-                            symbol=ticker.replace('/', ''),  # Remove slash for order
-                            notional=notional,  # Use notional for crypto
-                            side='buy',
-                            type='market',
-                            time_in_force='gtc'
-                        )
-                    else:
-                        # Calculate maximum shares for stocks
-                        max_shares = int(buying_power * 0.95 / current_price)
-                        logger.info(f"Attempting to buy {max_shares} shares of {ticker}")
-                        
-                        order = api.submit_order(
-                            symbol=ticker,
-                            qty=max_shares,
-                            side='buy',
-                            type='market',
-                            time_in_force='gtc'
-                        )
-
+                    # Submit market order for 1 share to test
+                    order = api.submit_order(
+                        symbol=ticker,
+                        qty=1,  # Start with 1 share
+                        side='buy',
+                        type='market',
+                        time_in_force='gtc'
+                    )
                     logger.info(f"Buy order submitted: {order}")
                     return jsonify({
                         "message": "Buy order executed successfully",
