@@ -111,10 +111,13 @@ def webhook():
                 # Use the available quantity for the sell order
                 available_qty = float(position.qty)
 
-                # Submit order to sell entire position using available quantity
+                # Ensure we do not attempt to sell more than available
+                qty_to_sell = min(available_qty, round(available_qty, 6))  # Round to 6 decimal places
+
+                # Submit order to sell the available quantity
                 order = api.submit_order(
                     symbol=ticker,
-                    qty=round(available_qty, 6),  # Round to 6 decimal places for BTC
+                    qty=qty_to_sell,  # Use the calculated quantity
                     side='sell',
                     type='market',
                     time_in_force='gtc'
