@@ -27,8 +27,10 @@ api = tradeapi.REST(
 
 def get_crypto_price(symbol):
     try:
+        # Format symbol for API call (remove slash)
+        api_symbol = symbol.replace('/', '')
         # Get the latest crypto bar
-        bars = api.get_crypto_bars(symbol, timeframe='1Min', limit=1)
+        bars = api.get_crypto_bars(api_symbol, timeframe='1Min', limit=1)
         if len(bars) > 0:
             return float(bars[0].close)
         raise Exception("No price data found")
@@ -68,22 +70,20 @@ def webhook():
         if not signal or not ticker:
             return jsonify({'error': 'Missing signal or ticker'}), 400
 
-        # Format crypto ticker for Alpaca (SHIB/USD format)
-        if not ticker.endswith('USD'):
-            ticker = f"{ticker}/USD"
+        # Format display ticker (for logging)
+        display_ticker = f"{ticker}/USD" if not ticker.endswith('USD') else ticker
+        # Format order ticker (for API calls)
+        order_symbol = display_ticker.replace('/', '')
 
-        logger.info(f"Received signal: {signal} for ticker: {ticker}")
+        logger.info(f"Received signal: {signal} for ticker: {display_ticker}")
 
         # Verify the symbol exists by attempting to get its price
         try:
-            current_price = get_crypto_price(ticker)
-            logger.info(f"Successfully verified ticker {ticker} exists, current price: {current_price}")
+            current_price = get_crypto_price(display_ticker)
+            logger.info(f"Successfully verified ticker {display_ticker} exists, current price: {current_price}")
         except Exception as e:
-            logger.error(f"Invalid ticker {ticker}: {str(e)}")
-            return jsonify({'error': f'Invalid ticker {ticker}'}), 400
-
-        # Convert ticker format for order submission (remove slash)
-        order_symbol = ticker.replace('/', '')
+            logger.error(f"Invalid ticker {display_ticker}: {str(e)}")
+            return jsonify({'error': f'Invalid ticker {display_ticker}'}), 400
 
         if signal == 'Long Open':
             # Get account information
@@ -107,7 +107,7 @@ def webhook():
                 )
                 
                 if wait_for_order_fill(order.id):
-                    logger.info(f"Successfully opened long position for {ticker}")
+                    logger.info(f"Successfully opened long position for {display_ticker}")
                     return jsonify({'message': 'Long position opened successfully'}), 200
                 else:
                     return jsonify({'error': 'Order failed to fill'}), 400
@@ -134,7 +134,7 @@ def webhook():
                 )
                 
                 if wait_for_order_fill(order.id):
-                    logger.info(f"Successfully closed long position for {ticker}")
+                    logger.info(f"Successfully closed long position for {display_ticker}")
                     return jsonify({'message': 'Long position closed successfully'}), 200
                 else:
                     return jsonify({'error': 'Order failed to fill'}), 400
