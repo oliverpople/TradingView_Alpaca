@@ -25,6 +25,17 @@ api = tradeapi.REST(
     api_version='v2'
 )
 
+def get_crypto_price(symbol):
+    try:
+        # Get the latest crypto trade
+        trades = api.get_crypto_trades(symbol, limit=1).trades
+        if trades:
+            return float(trades[0].price)
+        raise Exception("No trades found")
+    except Exception as e:
+        logger.error(f"Error getting crypto price for {symbol}: {str(e)}")
+        raise
+
 def get_position_quantity(symbol):
     try:
         position = api.get_position(symbol)
@@ -63,11 +74,10 @@ def webhook():
 
         logger.info(f"Received signal: {signal} for ticker: {ticker}")
 
-        # Verify the symbol exists
+        # Verify the symbol exists by attempting to get its price
         try:
-            # Try to get the latest trade to verify the symbol
-            api.get_latest_trade(ticker)
-            logger.info(f"Successfully verified ticker {ticker} exists")
+            current_price = get_crypto_price(ticker)
+            logger.info(f"Successfully verified ticker {ticker} exists, current price: {current_price}")
         except Exception as e:
             logger.error(f"Invalid ticker {ticker}: {str(e)}")
             return jsonify({'error': f'Invalid ticker {ticker}'}), 400
@@ -76,10 +86,6 @@ def webhook():
             # Get account information
             account = api.get_account()
             buying_power = float(account.buying_power)
-            
-            # Get current price
-            ticker_data = api.get_latest_trade(ticker)
-            current_price = float(ticker_data.price)
             
             # Calculate quantity with 1% buffer for price movement
             quantity = int((buying_power * 0.99) / current_price)
