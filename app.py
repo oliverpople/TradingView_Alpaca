@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 import logging
 import time
+import requests
 
 # Configure logging
 logging.basicConfig(
@@ -25,23 +26,24 @@ api = tradeapi.REST(
     api_version='v2'
 )
 
-# Initialize Alpaca API for crypto data
-crypto_api = tradeapi.REST(
-    os.getenv('ALPACA_API_KEY'),
-    os.getenv('ALPACA_SECRET_KEY'),
-    'https://data.alpaca.markets',
-    api_version='v2'
-)
-
 def get_crypto_price(symbol):
     try:
         # Format symbol for API call (remove slash)
         api_symbol = symbol.replace('/', '')
-        # Get the latest crypto quote
-        quote = crypto_api.get_latest_crypto_quote(api_symbol)
-        if quote:
-            return float(quote.ask_price)  # Using ask price for buying
-        raise Exception("No quote data found")
+        
+        # Get latest trade from Alpaca Crypto API v2
+        url = f"https://data.alpaca.markets/v2/crypto/{api_symbol}/trades/latest"
+        headers = {
+            "APCA-API-KEY-ID": os.getenv('ALPACA_API_KEY'),
+            "APCA-API-SECRET-KEY": os.getenv('ALPACA_SECRET_KEY')
+        }
+        
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            trade_data = response.json()
+            return float(trade_data['trade']['p'])
+        
+        raise Exception(f"Failed to get price: {response.text}")
     except Exception as e:
         logger.error(f"Error getting crypto price for {symbol}: {str(e)}")
         raise
