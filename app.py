@@ -27,11 +27,11 @@ api = tradeapi.REST(
 
 def get_crypto_price(symbol):
     try:
-        # Get the latest crypto trade
-        trades = api.get_crypto_trades(symbol, limit=1).trades
-        if trades:
-            return float(trades[0].price)
-        raise Exception("No trades found")
+        # Get the latest crypto quote
+        quote = api.get_latest_crypto_quotes(symbol)
+        if quote and symbol in quote:
+            return float(quote[symbol].ap)  # ask price
+        raise Exception("No quote found")
     except Exception as e:
         logger.error(f"Error getting crypto price for {symbol}: {str(e)}")
         raise
@@ -70,7 +70,7 @@ def webhook():
 
         # Format crypto ticker for Alpaca (add USD suffix if not present)
         if not ticker.endswith('USD'):
-            ticker = f"{ticker}USD"
+            ticker = f"{ticker}/USD"  # Using correct format with slash
 
         logger.info(f"Received signal: {signal} for ticker: {ticker}")
 
@@ -81,6 +81,9 @@ def webhook():
         except Exception as e:
             logger.error(f"Invalid ticker {ticker}: {str(e)}")
             return jsonify({'error': f'Invalid ticker {ticker}'}), 400
+
+        # Convert ticker format for order submission (remove slash)
+        order_symbol = ticker.replace('/', '')
 
         if signal == 'Long Open':
             # Get account information
@@ -96,7 +99,7 @@ def webhook():
             # Place buy order
             try:
                 order = api.submit_order(
-                    symbol=ticker,
+                    symbol=order_symbol,
                     qty=quantity,
                     side='buy',
                     type='market',
@@ -115,7 +118,7 @@ def webhook():
 
         elif signal == 'Long Close':
             # Get current position
-            quantity = get_position_quantity(ticker)
+            quantity = get_position_quantity(order_symbol)
             
             if quantity <= 0:
                 return jsonify({'message': 'No position to close'}), 200
@@ -123,7 +126,7 @@ def webhook():
             # Place sell order
             try:
                 order = api.submit_order(
-                    symbol=ticker,
+                    symbol=order_symbol,
                     qty=quantity,
                     side='sell',
                     type='market',
