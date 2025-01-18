@@ -27,11 +27,11 @@ api = tradeapi.REST(
 
 def get_crypto_price(symbol):
     try:
-        # Get the latest crypto quote
-        quote = api.get_latest_crypto_quotes(symbol)
-        if quote and symbol in quote:
-            return float(quote[symbol].ap)  # ask price
-        raise Exception("No quote found")
+        # Get the latest crypto bar
+        bars = api.get_crypto_bars(symbol, timeframe='1Min', limit=1)
+        if len(bars) > 0:
+            return float(bars[0].close)
+        raise Exception("No price data found")
     except Exception as e:
         logger.error(f"Error getting crypto price for {symbol}: {str(e)}")
         raise
@@ -68,9 +68,9 @@ def webhook():
         if not signal or not ticker:
             return jsonify({'error': 'Missing signal or ticker'}), 400
 
-        # Format crypto ticker for Alpaca (add USD suffix if not present)
+        # Format crypto ticker for Alpaca (SHIB/USD format)
         if not ticker.endswith('USD'):
-            ticker = f"{ticker}/USD"  # Using correct format with slash
+            ticker = f"{ticker}/USD"
 
         logger.info(f"Received signal: {signal} for ticker: {ticker}")
 
