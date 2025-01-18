@@ -17,7 +17,7 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Initialize Alpaca API
+# Initialize Alpaca API for trading
 api = tradeapi.REST(
     os.getenv('ALPACA_API_KEY'),
     os.getenv('ALPACA_SECRET_KEY'),
@@ -25,15 +25,23 @@ api = tradeapi.REST(
     api_version='v2'
 )
 
+# Initialize Alpaca API for crypto data
+crypto_api = tradeapi.REST(
+    os.getenv('ALPACA_API_KEY'),
+    os.getenv('ALPACA_SECRET_KEY'),
+    'https://data.alpaca.markets',
+    api_version='v2'
+)
+
 def get_crypto_price(symbol):
     try:
         # Format symbol for API call (remove slash)
         api_symbol = symbol.replace('/', '')
-        # Get the latest crypto bar
-        bars = api.get_crypto_bars(api_symbol, timeframe='1Min', limit=1)
-        if len(bars) > 0:
-            return float(bars[0].close)
-        raise Exception("No price data found")
+        # Get the latest crypto quote
+        quote = crypto_api.get_latest_crypto_quote(api_symbol)
+        if quote:
+            return float(quote.ask_price)  # Using ask price for buying
+        raise Exception("No quote data found")
     except Exception as e:
         logger.error(f"Error getting crypto price for {symbol}: {str(e)}")
         raise
