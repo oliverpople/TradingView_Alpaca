@@ -29,7 +29,8 @@ def get_position_quantity(symbol):
     try:
         position = api.get_position(symbol)
         return float(position.qty)
-    except:
+    except Exception as e:
+        logger.error(f"Error getting position for {symbol}: {str(e)}")
         return 0.0
 
 def wait_for_order_fill(order_id, timeout=60):
@@ -56,7 +57,20 @@ def webhook():
         if not signal or not ticker:
             return jsonify({'error': 'Missing signal or ticker'}), 400
 
+        # Format crypto ticker for Alpaca (add USD suffix if not present)
+        if not ticker.endswith('USD'):
+            ticker = f"{ticker}USD"
+
         logger.info(f"Received signal: {signal} for ticker: {ticker}")
+
+        # Verify the symbol exists
+        try:
+            # Try to get the latest trade to verify the symbol
+            api.get_latest_trade(ticker)
+            logger.info(f"Successfully verified ticker {ticker} exists")
+        except Exception as e:
+            logger.error(f"Invalid ticker {ticker}: {str(e)}")
+            return jsonify({'error': f'Invalid ticker {ticker}'}), 400
 
         if signal == 'Long Open':
             # Get account information
