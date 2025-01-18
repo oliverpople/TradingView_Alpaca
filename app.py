@@ -25,133 +25,107 @@ api = tradeapi.REST(
     api_version='v2'
 )
 
-@app.route('/')
-def home():
-    return "TradingView Webhook Server is running!"
+def get_position_quantity(symbol):
+    try:
+        position = api.get_position(symbol)
+        return float(position.qty)
+    except:
+        return 0.0
+
+def wait_for_order_fill(order_id, timeout=60):
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        order = api.get_order(order_id)
+        if order.status == 'filled':
+            return True
+        elif order.status == 'rejected' or order.status == 'canceled':
+            return False
+        time.sleep(1)
+    return False
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
-        logger.info(f"Received webhook request: {request.json}")
-        
-        if not request.json:
-            logger.error("No JSON data received")
-            return jsonify({"error": "No JSON data received"}), 400
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data received'}), 400
 
-        data = request.json
-        action = data.get('action')
+        signal = data.get('signal')
         ticker = data.get('ticker')
 
-        if not action or not ticker:
-            logger.error(f"Missing required fields. Received: {data}")
-            return jsonify({"error": "Missing action or ticker"}), 400
+        if not signal or not ticker:
+            return jsonify({'error': 'Missing signal or ticker'}), 400
 
-        # Ensure proper crypto ticker format (BTC/USD -> BTCUSD)
-        if '/' in ticker:
-            ticker = ticker.replace('/', '')
-        
-        logger.info(f"Processing {action} order for {ticker}")
+        logger.info(f"Received signal: {signal} for ticker: {ticker}")
 
-        if action == 'Buy':
+        if signal == 'Long Open':
+            # Get account information
+            account = api.get_account()
+            buying_power = float(account.buying_power)
+            
+            # Get current price
+            ticker_data = api.get_latest_trade(ticker)
+            current_price = float(ticker_data.price)
+            
+            # Calculate quantity with 1% buffer for price movement
+            quantity = int((buying_power * 0.99) / current_price)
+            
+            if quantity <= 0:
+                return jsonify({'error': 'Insufficient buying power'}), 400
+
+            # Place buy order
             try:
-                # Get account info
-                account = api.get_account()
-                buying_power = float(account.cash)
-                logger.info(f"Available buying power: ${buying_power}")
-
-                # Check if buying power is sufficient
-                if buying_power >= 10:  # Minimum order amount
-                    # Submit market order using all available cash
-                    order = api.submit_order(
-                        symbol=ticker,
-                        notional=buying_power,  # Use all available cash for the buy order
-                        side='buy',
-                        type='market',
-                        time_in_force='gtc'
-                    )
-                    logger.info(f"Buy order submitted: {order}")
-                else:
-                    logger.error("Insufficient funds for minimum order amount of $10")
-                    return jsonify({"error": "Insufficient funds for minimum order amount of $10"}), 400
-
-                # Wait briefly for order to process
-                time.sleep(2)
-                
-                # Check order status
-                filled_order = api.get_order(order.id)
-                logger.info(f"Order status: {filled_order.status}, filled quantity: {filled_order.filled_qty}")
-                
-                if filled_order.status == 'filled':
-                    return jsonify({
-                        "message": "Buy order executed successfully",
-                        "order_id": order.id,
-                        "amount": buying_power,
-                        "filled_qty": filled_order.filled_qty,
-                        "filled_price": filled_order.filled_avg_price,
-                        "ticker": ticker
-                    }), 200
-                else:
-                    logger.error(f"Order not filled. Status: {filled_order.status}")
-                    return jsonify({"error": f"Order not filled. Status: {filled_order.status}"}), 500
-
-            except Exception as e:
-                logger.error(f"Error executing buy order: {str(e)}")
-                return jsonify({"error": f"Failed to execute buy order: {str(e)}"}), 500
-
-        elif action == 'Sell':
-            try:
-                # Get current position
-                position = api.get_position(ticker)
-                logger.info(f"Current position: {position.qty} {ticker} at market value ${position.market_value}")
-
-                if float(position.qty) <= 0:
-                    logger.error("No position to sell")
-                    return jsonify({"error": "No position to sell"}), 400
-
-                # Use the available quantity for the sell order
-                available_qty = float(position.qty)
-
-                # Ensure we do not attempt to sell more than available
-                qty_to_sell = min(available_qty, round(available_qty, 6))  # Round to 6 decimal places
-
-                # Submit order to sell the available quantity
                 order = api.submit_order(
                     symbol=ticker,
-                    qty=qty_to_sell,  # Use the calculated quantity
+                    qty=quantity,
+                    side='buy',
+                    type='market',
+                    time_in_force='gtc'
+                )
+                
+                if wait_for_order_fill(order.id):
+                    logger.info(f"Successfully opened long position for {ticker}")
+                    return jsonify({'message': 'Long position opened successfully'}), 200
+                else:
+                    return jsonify({'error': 'Order failed to fill'}), 400
+                
+            except Exception as e:
+                logger.error(f"Error placing buy order: {str(e)}")
+                return jsonify({'error': str(e)}), 400
+
+        elif signal == 'Long Close':
+            # Get current position
+            quantity = get_position_quantity(ticker)
+            
+            if quantity <= 0:
+                return jsonify({'message': 'No position to close'}), 200
+
+            # Place sell order
+            try:
+                order = api.submit_order(
+                    symbol=ticker,
+                    qty=quantity,
                     side='sell',
                     type='market',
                     time_in_force='gtc'
                 )
-                logger.info(f"Sell order submitted: {order}")
                 
-                # Wait briefly for order to process
-                time.sleep(2)
-                
-                # Check order status
-                filled_order = api.get_order(order.id)
-                logger.info(f"Order status: {filled_order.status}, filled quantity: {filled_order.filled_qty}")
-                
-                if filled_order.status == 'filled':
-                    return jsonify({
-                        "message": "Sell order executed successfully",
-                        "order_id": order.id,
-                        "quantity": filled_order.filled_qty,
-                        "filled_price": filled_order.filled_avg_price,
-                        "ticker": ticker
-                    }), 200
+                if wait_for_order_fill(order.id):
+                    logger.info(f"Successfully closed long position for {ticker}")
+                    return jsonify({'message': 'Long position closed successfully'}), 200
                 else:
-                    logger.error(f"Order not filled. Status: {filled_order.status}")
-                    return jsonify({"error": f"Order not filled. Status: {filled_order.status}"}), 500
-
+                    return jsonify({'error': 'Order failed to fill'}), 400
+                
             except Exception as e:
-                logger.error(f"Error executing sell order: {str(e)}")
-                return jsonify({"error": f"Failed to execute sell order: {str(e)}"}), 500
-        else:
-            return jsonify({"error": "Invalid action"}), 400
+                logger.error(f"Error placing sell order: {str(e)}")
+                return jsonify({'error': str(e)}), 400
+
+        return jsonify({'error': 'Invalid signal'}), 400
 
     except Exception as e:
         logger.error(f"Error processing webhook: {str(e)}")
-        return jsonify({"error": f"Failed to process webhook: {str(e)}"}), 500
+        return jsonify({'error': str(e)}), 500
 
-if __name__ == "__main__":
-    app.run(port=8000, debug=True)
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
+
