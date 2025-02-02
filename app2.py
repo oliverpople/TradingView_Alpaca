@@ -88,20 +88,21 @@ def fetch_data(tickers, period, interval):
             yf_ticker = get_yfinance_ticker(alpaca_ticker)
             logging.info(f"Fetching data for {alpaca_ticker} (yFinance: {yf_ticker})")
             
-            # Download data with threading disabled
+            # Download data with threading disabled and prepost set to True for crypto
             df = yf.download(
                 yf_ticker, 
                 period=period, 
                 interval=interval, 
                 progress=False, 
                 threads=False,  # Disable threading
-                ignore_tz=True  # Ignore timezone handling
+                prepost=True,  # Include all hours for crypto
+                rounding=True  # Round numbers
             )
             
             if not df.empty:
                 try:
                     # Convert index to datetime without timezone info
-                    df.index = pd.to_datetime(df.index).tz_localize(None)
+                    df.index = pd.DatetimeIndex([pd.Timestamp(x).replace(tzinfo=None) for x in df.index])
                     
                     # Log the time range of data
                     logging.info(f"{alpaca_ticker} data range: {df.index[0]} to {df.index[-1]}")
