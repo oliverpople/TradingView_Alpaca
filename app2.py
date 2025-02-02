@@ -94,24 +94,14 @@ def fetch_data(tickers, period, interval):
                 period=period, 
                 interval=interval, 
                 progress=False, 
-                threads=False  # Disable threading
+                threads=False,  # Disable threading
+                ignore_tz=True  # Ignore timezone handling
             )
             
             if not df.empty:
                 try:
-                    # Convert index to datetime if it isn't already
-                    df.index = pd.to_datetime(df.index)
-                    
-                    # Create a new timezone-aware index
-                    new_index = pd.date_range(
-                        start=df.index[0],
-                        end=df.index[-1],
-                        periods=len(df.index),
-                        tz='UTC'
-                    )
-                    
-                    # Assign the new index
-                    df.index = new_index
+                    # Convert index to datetime without timezone info
+                    df.index = pd.to_datetime(df.index).tz_localize(None)
                     
                     # Log the time range of data
                     logging.info(f"{alpaca_ticker} data range: {df.index[0]} to {df.index[-1]}")
@@ -120,8 +110,8 @@ def fetch_data(tickers, period, interval):
                     df = df[['Close']].astype('float32').copy()
                     data[alpaca_ticker] = df
                     logging.info(f"Successfully processed data for {alpaca_ticker}")
-                except Exception as tz_error:
-                    logging.error(f"Error processing data for {alpaca_ticker}: {tz_error}")
+                except Exception as e:
+                    logging.error(f"Error processing data for {alpaca_ticker}: {e}")
             else:
                 logging.warning(f"Empty data received for {alpaca_ticker}")
             
