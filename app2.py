@@ -357,9 +357,8 @@ def fetch_account_cash():
     return cash
 
 def is_market_open():
-    """Check if the market is currently open"""
-    clock = alpaca.get_clock()
-    return clock.is_open
+    """Always return True for crypto trading since crypto markets are 24/7"""
+    return True
 
 def cancel_existing_orders(symbol=None):
     """Cancel all existing orders, or orders for a specific symbol"""
@@ -689,17 +688,13 @@ def main(trade_type):
 
 if __name__ == "__main__":
     trade_type = 'fiveMinute'
-    logging.info(f"Starting application at {datetime.now()}")
+    logging.info(f"Starting crypto trading application at {datetime.now()}")
     while True:
         try:
-            if is_market_open():
-                logging.info(f"Market is open at {datetime.now()}")
-                main(trade_type)
-            else:
-                logging.info(f"Market is closed at {datetime.now()}")
-            
+            logging.info(f"Starting new trading cycle at {datetime.now()}")
+            main(trade_type)
             gc.collect()  # Force garbage collection after each iteration
-            time.sleep(60)
+            time.sleep(60)  # Wait for 1 minute before next cycle
         except Exception as e:
             logging.error(f"Error during execution at {datetime.now()}: {e}")
             gc.collect()  # Force garbage collection after error
