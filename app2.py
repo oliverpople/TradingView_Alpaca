@@ -225,12 +225,14 @@ def calculate_all_ratios(df_dict):
     return ratio_dict
 
 def find_best_long(df_dict_1m, df_dict_3m, df_dict_5m, ratio_dict_1m, ratio_dict_3m, ratio_dict_5m, date):
+    logging.info("Starting best long search across all timeframes")
     threshold = -1.2
     candidates_1m = []
     candidates_3m = []
     candidates_5m = []
     
     # Find candidates for each timeframe
+    logging.info("Analyzing 1-minute timeframe candidates...")
     for ticker, df in df_dict_1m.items():
         if date in df.index:
             current_score = df.loc[date, 'score']
@@ -239,7 +241,11 @@ def find_best_long(df_dict_1m, df_dict_3m, df_dict_5m, ratio_dict_1m, ratio_dict
             if np.isscalar(current_score) and np.isscalar(plot_good):
                 if current_score < threshold and abs(current_score - plot_good) < 0.2:
                     candidates_1m.append((ticker, current_score))
+                    logging.info(f"1m candidate found: {ticker} (score: {current_score:.4f})")
 
+    logging.info(f"Found {len(candidates_1m)} candidates in 1-minute timeframe")
+
+    logging.info("Analyzing 3-minute timeframe candidates...")
     for ticker, df in df_dict_3m.items():
         if date in df.index:
             current_score = df.loc[date, 'score']
@@ -248,7 +254,11 @@ def find_best_long(df_dict_1m, df_dict_3m, df_dict_5m, ratio_dict_1m, ratio_dict
             if np.isscalar(current_score) and np.isscalar(plot_good):
                 if current_score < threshold and abs(current_score - plot_good) < 0.2:
                     candidates_3m.append(ticker)
+                    logging.info(f"3m candidate found: {ticker} (score: {current_score:.4f})")
 
+    logging.info(f"Found {len(candidates_3m)} candidates in 3-minute timeframe")
+
+    logging.info("Analyzing 5-minute timeframe candidates...")
     for ticker, df in df_dict_5m.items():
         if date in df.index:
             current_score = df.loc[date, 'score']
@@ -257,24 +267,37 @@ def find_best_long(df_dict_1m, df_dict_3m, df_dict_5m, ratio_dict_1m, ratio_dict
             if np.isscalar(current_score) and np.isscalar(plot_good):
                 if current_score < threshold and abs(current_score - plot_good) < 0.2:
                     candidates_5m.append(ticker)
+                    logging.info(f"5m candidate found: {ticker} (score: {current_score:.4f})")
+
+    logging.info(f"Found {len(candidates_5m)} candidates in 5-minute timeframe")
 
     # Only keep 1m candidates that appear in all timeframes
     filtered_candidates = [(ticker, score) for ticker, score in candidates_1m 
                          if ticker in candidates_3m and ticker in candidates_5m]
 
+    logging.info(f"Found {len(filtered_candidates)} candidates that appear in all timeframes")
+    if filtered_candidates:
+        for ticker, score in filtered_candidates:
+            logging.info(f"Confirmed candidate across all timeframes: {ticker} (1m score: {score:.4f})")
+
     if not filtered_candidates:
+        logging.info("No candidates found that appear in all timeframes")
         return None
 
     filtered_candidates.sort(key=lambda x: x[1])
     top_candidates = filtered_candidates[:min(30, len(filtered_candidates))]
+    logging.info(f"Selected top {len(top_candidates)} candidates for ratio analysis")
 
     best_long = None
     avg_ratio = float('inf')
     
-    for ticker, _ in top_candidates:
+    logging.info("Starting ratio analysis for top candidates...")
+    for ticker, score in top_candidates:
         ratio_scores = []
+        logging.info(f"Analyzing ratios for {ticker}...")
         # Check ratios in all timeframes
-        for ratio_dict in [ratio_dict_1m, ratio_dict_3m, ratio_dict_5m]:
+        for timeframe, ratio_dict in [("1m", ratio_dict_1m), ("3m", ratio_dict_3m), ("5m", ratio_dict_5m)]:
+            timeframe_ratio_count = 0
             for ratio, ratio_df in ratio_dict.items():
                 if ticker in ratio.split('/') and date in ratio_df.index:
                     ratio_score = ratio_df.loc[date, 'score']
@@ -283,12 +306,22 @@ def find_best_long(df_dict_1m, df_dict_3m, df_dict_5m, ratio_dict_1m, ratio_dict
                     if np.isscalar(ratio_score) and np.isscalar(ratio_plot_good):
                         if ratio_score < -1 and abs(ratio_score - ratio_plot_good) < 0.2:
                             ratio_scores.append(ratio_score)
+                            timeframe_ratio_count += 1
+            
+            logging.info(f"{timeframe} timeframe: Found {timeframe_ratio_count} qualifying ratios for {ticker}")
 
         if ratio_scores:
             current_avg = sum(ratio_scores) / len(ratio_scores)
+            logging.info(f"{ticker} average ratio score: {current_avg:.4f} (from {len(ratio_scores)} ratios)")
             if current_avg < avg_ratio:
                 avg_ratio = current_avg
                 best_long = ticker
+                logging.info(f"New best candidate: {ticker} with average ratio score: {current_avg:.4f}")
+
+    if best_long:
+        logging.info(f"Selected final best long candidate: {best_long} with average ratio score: {avg_ratio:.4f}")
+    else:
+        logging.info("No suitable long candidate found after ratio analysis")
                 
     return best_long
 
@@ -452,6 +485,8 @@ def fetch_current_positions():
 # Modify `trading_strategy` to log portfolio proportions
 def trading_strategy(df_dict_1m, df_dict_3m, df_dict_5m, ratio_dict_1m, ratio_dict_3m, ratio_dict_5m, trade_type):
     print("Running strategy")
+    logging.info("=== Starting Trading Strategy Execution ===")
+    
     if not df_dict_1m or not df_dict_3m or not df_dict_5m:
         logging.error("Missing data for one or more timeframes. Cannot run strategy.")
         return []
@@ -460,64 +495,90 @@ def trading_strategy(df_dict_1m, df_dict_3m, df_dict_5m, ratio_dict_1m, ratio_di
     
     # Get the latest timestamp from 1m data (most granular)
     latest_date = max(df.index[-1] for df in df_dict_1m.values())
-    logging.info(f"Checking positions at {latest_date}")
+    logging.info(f"Analysis timestamp: {latest_date}")
+    logging.info(f"Data coverage: 1m: {len(df_dict_1m)} tickers, 3m: {len(df_dict_3m)} tickers, 5m: {len(df_dict_5m)} tickers")
 
     # Fetch real-time current positions from Alpaca
     current_positions = fetch_current_positions()
+    logging.info(f"Current position count: {len(current_positions)}")
 
     # Log portfolio proportions using 1m data
     log_portfolio_proportions(current_positions, fetch_account_cash(), df_dict_1m)
 
     # FIRST: Check existing positions for selling (using 1m data for exits)
+    logging.info("=== Checking Exit Signals ===")
     for pos in current_positions:
         ticker = pos['ticker']
         quantity = pos['quantity']
+        logging.info(f"Analyzing exit conditions for {ticker} (Quantity: {quantity})")
+        
         if ticker in df_dict_1m:
             df = df_dict_1m[ticker]
             latest_data = df.iloc[-1]
             score = latest_data['score']
             plot_bad = latest_data['plot_bad']
             current_price = latest_data['Close']
+            
+            logging.info(f"{ticker} - Current Score: {score:.4f}, Plot Bad: {plot_bad:.4f}, Price: {current_price:.4f}")
 
             if abs(score - plot_bad) < 0.2:
+                logging.info(f"Exit signal triggered for {ticker}")
+                logging.info(f"Score-Plot Bad difference: {abs(score - plot_bad):.4f}")
                 place_order(ticker, None, 'sell', quantity=quantity)
-                logging.info(f"Closed position for {ticker} at {current_price}")
+                logging.info(f"Executed sell order for {ticker} at {current_price}")
                 trades.append({
                     "ticker": ticker,
                     "exitPrice": current_price,
                     "exitDate": latest_date.strftime('%Y-%m-%d %H:%M:%S')
                 })
+            else:
+                logging.info(f"No exit signal for {ticker}")
 
     # SECOND: Only try to open new positions if under max_positions
+    logging.info("=== Checking Entry Signals ===")
     if len(current_positions) >= max_positions:
-        logging.info("Max concurrent positions reached, skipping new trades")
+        logging.info(f"Max positions ({max_positions}) reached, skipping new trades")
         return trades
 
+    logging.info(f"Looking for new positions. Current: {len(current_positions)}, Max: {max_positions}")
+    
     # Find and execute new trades using all timeframes
     best_long = find_best_long(df_dict_1m, df_dict_3m, df_dict_5m, 
                              ratio_dict_1m, ratio_dict_3m, ratio_dict_5m, 
                              latest_date)
     
-    if best_long and best_long not in [pos['ticker'] for pos in current_positions]:
-        # Use 1m data for entry price
-        entry_price = df_dict_1m[best_long].iloc[-1]['Close']
-        amount = calculate_position_size()
-        
-        # Log confirmation of signal across all timeframes
-        logging.info(f"Signal confirmed across all timeframes for {best_long}")
-        logging.info(f"1m timeframe score: {df_dict_1m[best_long].iloc[-1]['score']}")
-        logging.info(f"3m timeframe score: {df_dict_3m[best_long].iloc[-1]['score']}")
-        logging.info(f"5m timeframe score: {df_dict_5m[best_long].iloc[-1]['score']}")
-        
-        place_order(best_long, amount, 'buy')
-        logging.info(f"Opened position for {best_long} at {entry_price}")
-        trades.append({
-            "ticker": best_long,
-            "entryPrice": entry_price,
-            "entryDate": latest_date.strftime('%Y-%m-%d %H:%M:%S'),
-            "quantity": amount / entry_price
-        })
+    if best_long:
+        if best_long not in [pos['ticker'] for pos in current_positions]:
+            # Use 1m data for entry price
+            entry_price = df_dict_1m[best_long].iloc[-1]['Close']
+            amount = calculate_position_size()
+            
+            logging.info("=== New Trade Opportunity Found ===")
+            logging.info(f"Ticker: {best_long}")
+            logging.info(f"Entry Price: {entry_price}")
+            logging.info(f"Position Size: ${amount}")
+            
+            # Log detailed signal information
+            logging.info("Signal Details Across Timeframes:")
+            for timeframe, df_dict in [("1m", df_dict_1m), ("3m", df_dict_3m), ("5m", df_dict_5m)]:
+                df = df_dict[best_long]
+                latest = df.iloc[-1]
+                logging.info(f"{timeframe} - Score: {latest['score']:.4f}, Plot Good: {latest['plot_good']:.4f}")
+            
+            place_order(best_long, amount, 'buy')
+            logging.info(f"Buy order executed for {best_long}")
+            trades.append({
+                "ticker": best_long,
+                "entryPrice": entry_price,
+                "entryDate": latest_date.strftime('%Y-%m-%d %H:%M:%S'),
+                "quantity": amount / entry_price
+            })
+        else:
+            logging.info(f"Best candidate {best_long} already in portfolio, skipping")
+    else:
+        logging.info("No suitable long candidates found")
 
+    logging.info(f"=== Strategy Execution Complete - {len(trades)} trades executed ===")
     return trades
 
 def clear_dataframes(data_dict, ratio_dict):
