@@ -13,11 +13,17 @@ from functools import reduce
 from datetime import datetime
 from alpaca_trade_api import REST
 import time
+import os
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 warnings.filterwarnings('ignore')
 
-# Initialize Alpaca API
+# Access the environment variables
+ALPACA_API_KEY = os.getenv('ALPACA_API_KEY')
+ALPACA_SECRET_KEY = os.getenv('ALPACA_SECRET_KEY')
+API_BASE_URL = os.getenv('ALPACA_API_URL')
+
+# Initialize the Alpaca API
 alpaca = REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, API_BASE_URL)
 
 api = tradeapi.REST(
@@ -26,6 +32,9 @@ api = tradeapi.REST(
     'https://paper-api.alpaca.markets',
     api_version='v2'
 )
+
+
+
 # Define tickers in Alpaca syntax
 # tickers = [
     #etfs
