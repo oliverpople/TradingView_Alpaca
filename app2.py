@@ -249,11 +249,11 @@ def calculate_all_ratios(df_dict):
             logging.warning(f"Failed to calculate ratio for {ticker1}/{ticker2}: {e}")
     return ratio_dict
 
-def find_best_long(df_dict_1m, df_dict_3m, df_dict_5m, ratio_dict_1m, ratio_dict_3m, ratio_dict_5m, date):
+def find_best_long(df_dict_1m, df_dict_2m, df_dict_5m, ratio_dict_1m, ratio_dict_2m, ratio_dict_5m, date):
     logging.info("Starting best long search across all timeframes")
     threshold = -1.2
     candidates_1m = []
-    candidates_3m = []
+    candidates_2m = []
     candidates_5m = []
     
     # Find candidates for each timeframe
@@ -270,18 +270,18 @@ def find_best_long(df_dict_1m, df_dict_3m, df_dict_5m, ratio_dict_1m, ratio_dict
 
     logging.info(f"Found {len(candidates_1m)} candidates in 1-minute timeframe")
 
-    logging.info("Analyzing 3-minute timeframe candidates...")
-    for ticker, df in df_dict_3m.items():
+    logging.info("Analyzing 2-minute timeframe candidates...")
+    for ticker, df in df_dict_2m.items():
         if date in df.index:
             current_score = df.loc[date, 'score']
             plot_good = df.loc[date, 'plot_good']
             
             if np.isscalar(current_score) and np.isscalar(plot_good):
                 if current_score < threshold and abs(current_score - plot_good) < 0.2:
-                    candidates_3m.append(ticker)
-                    logging.info(f"3m candidate found: {ticker} (score: {current_score:.4f})")
+                    candidates_2m.append(ticker)
+                    logging.info(f"2m candidate found: {ticker} (score: {current_score:.4f})")
 
-    logging.info(f"Found {len(candidates_3m)} candidates in 3-minute timeframe")
+    logging.info(f"Found {len(candidates_2m)} candidates in 2-minute timeframe")
 
     logging.info("Analyzing 5-minute timeframe candidates...")
     for ticker, df in df_dict_5m.items():
@@ -298,7 +298,7 @@ def find_best_long(df_dict_1m, df_dict_3m, df_dict_5m, ratio_dict_1m, ratio_dict
 
     # Only keep 1m candidates that appear in all timeframes
     filtered_candidates = [(ticker, score) for ticker, score in candidates_1m 
-                         if ticker in candidates_3m and ticker in candidates_5m]
+                         if ticker in candidates_2m and ticker in candidates_5m]
 
     logging.info(f"Found {len(filtered_candidates)} candidates that appear in all timeframes")
     if filtered_candidates:
@@ -321,7 +321,7 @@ def find_best_long(df_dict_1m, df_dict_3m, df_dict_5m, ratio_dict_1m, ratio_dict
         ratio_scores = []
         logging.info(f"Analyzing ratios for {ticker}...")
         # Check ratios in all timeframes
-        for timeframe, ratio_dict in [("1m", ratio_dict_1m), ("3m", ratio_dict_3m), ("5m", ratio_dict_5m)]:
+        for timeframe, ratio_dict in [("1m", ratio_dict_1m), ("2m", ratio_dict_2m), ("5m", ratio_dict_5m)]:
             timeframe_ratio_count = 0
             for ratio, ratio_df in ratio_dict.items():
                 if ticker in ratio.split('/') and date in ratio_df.index:
@@ -507,11 +507,11 @@ def fetch_current_positions():
         return []
     
 # Modify `trading_strategy` to log portfolio proportions
-def trading_strategy(df_dict_1m, df_dict_3m, df_dict_5m, ratio_dict_1m, ratio_dict_3m, ratio_dict_5m, trade_type):
+def trading_strategy(df_dict_1m, df_dict_2m, df_dict_5m, ratio_dict_1m, ratio_dict_2m, ratio_dict_5m, trade_type):
     print("Running strategy")
     logging.info("=== Starting Trading Strategy Execution ===")
     
-    if not df_dict_1m or not df_dict_3m or not df_dict_5m:
+    if not df_dict_1m or not df_dict_2m or not df_dict_5m:
         logging.error("Missing data for one or more timeframes. Cannot run strategy.")
         return []
         
@@ -520,7 +520,7 @@ def trading_strategy(df_dict_1m, df_dict_3m, df_dict_5m, ratio_dict_1m, ratio_di
     # Get the latest timestamp from 1m data (most granular)
     latest_date = max(df.index[-1] for df in df_dict_1m.values())
     logging.info(f"Analysis timestamp: {latest_date}")
-    logging.info(f"Data coverage: 1m: {len(df_dict_1m)} tickers, 3m: {len(df_dict_3m)} tickers, 5m: {len(df_dict_5m)} tickers")
+    logging.info(f"Data coverage: 1m: {len(df_dict_1m)} tickers, 2m: {len(df_dict_2m)} tickers, 5m: {len(df_dict_5m)} tickers")
 
     # Fetch real-time current positions from Alpaca
     current_positions = fetch_current_positions()
@@ -567,8 +567,8 @@ def trading_strategy(df_dict_1m, df_dict_3m, df_dict_5m, ratio_dict_1m, ratio_di
     logging.info(f"Looking for new positions. Current: {len(current_positions)}, Max: {max_positions}")
     
     # Find and execute new trades using all timeframes
-    best_long = find_best_long(df_dict_1m, df_dict_3m, df_dict_5m, 
-                             ratio_dict_1m, ratio_dict_3m, ratio_dict_5m, 
+    best_long = find_best_long(df_dict_1m, df_dict_2m, df_dict_5m, 
+                             ratio_dict_1m, ratio_dict_2m, ratio_dict_5m, 
                              latest_date)
     
     if best_long:
@@ -584,7 +584,7 @@ def trading_strategy(df_dict_1m, df_dict_3m, df_dict_5m, ratio_dict_1m, ratio_di
             
             # Log detailed signal information
             logging.info("Signal Details Across Timeframes:")
-            for timeframe, df_dict in [("1m", df_dict_1m), ("3m", df_dict_3m), ("5m", df_dict_5m)]:
+            for timeframe, df_dict in [("1m", df_dict_1m), ("2m", df_dict_2m), ("5m", df_dict_5m)]:
                 df = df_dict[best_long]
                 latest = df.iloc[-1]
                 logging.info(f"{timeframe} - Score: {latest['score']:.4f}, Plot Good: {latest['plot_good']:.4f}")
@@ -622,10 +622,10 @@ def main(trade_type):
         
         # Initialize dictionaries for each timeframe
         df_dict_1m = {}
-        df_dict_3m = {}
+        df_dict_2m = {}
         df_dict_5m = {}
         ratio_dict_1m = {}
-        ratio_dict_3m = {}
+        ratio_dict_2m = {}
         ratio_dict_5m = {}
         
         # First pass: Calculate indicators for individual tickers in all timeframes
@@ -637,11 +637,11 @@ def main(trade_type):
                     df_dict_1m[ticker] = calculate_indicators(single_data_1m[ticker])
                     del single_data_1m
                 
-                # Fetch and process for 3m timeframe
-                single_data_3m = fetch_data([ticker], '5d', '3m')
-                if single_data_3m and ticker in single_data_3m:
-                    df_dict_3m[ticker] = calculate_indicators(single_data_3m[ticker])
-                    del single_data_3m
+                # Fetch and process for 2m timeframe
+                single_data_2m = fetch_data([ticker], '5d', '2m')
+                if single_data_2m and ticker in single_data_2m:
+                    df_dict_2m[ticker] = calculate_indicators(single_data_2m[ticker])
+                    del single_data_2m
                 
                 # Fetch and process for 5m timeframe
                 single_data_5m = fetch_data([ticker], '5d', '5m')
@@ -657,7 +657,7 @@ def main(trade_type):
         # Second pass: Calculate ratios for each timeframe in smaller batches
         batch_size = 10
         for timeframe_dict, ratio_dict in [(df_dict_1m, ratio_dict_1m), 
-                                         (df_dict_3m, ratio_dict_3m), 
+                                         (df_dict_2m, ratio_dict_2m),
                                          (df_dict_5m, ratio_dict_5m)]:
             tickers_list = list(timeframe_dict.keys())
             for i in range(0, len(tickers_list), batch_size):
@@ -668,8 +668,8 @@ def main(trade_type):
                 gc.collect()
         
         # Modify trading_strategy call to include all timeframes
-        trades = trading_strategy(df_dict_1m, df_dict_3m, df_dict_5m, 
-                                ratio_dict_1m, ratio_dict_3m, ratio_dict_5m, 
+        trades = trading_strategy(df_dict_1m, df_dict_2m, df_dict_5m, 
+                                ratio_dict_1m, ratio_dict_2m, ratio_dict_5m, 
                                 trade_type)
         logging.info(f"Completed trades: {len(trades)}")
         print(json.dumps(trades, indent=2))
@@ -678,10 +678,10 @@ def main(trade_type):
         logging.error(f"Error in main loop: {e}")
     finally:
         # Clear memory for all timeframes
-        for df_dict in [df_dict_1m, df_dict_3m, df_dict_5m]:
+        for df_dict in [df_dict_1m, df_dict_2m, df_dict_5m]:
             if df_dict:
                 clear_dataframes(df_dict, {})
-        for ratio_dict in [ratio_dict_1m, ratio_dict_3m, ratio_dict_5m]:
+        for ratio_dict in [ratio_dict_1m, ratio_dict_2m, ratio_dict_5m]:
             if ratio_dict:
                 clear_dataframes({}, ratio_dict)
         gc.collect()
