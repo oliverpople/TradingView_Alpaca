@@ -18,21 +18,18 @@ import os
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 warnings.filterwarnings('ignore')
+# Use environment variables
+ALPACA_API_KEY = os.environ.get('PUBLIC_KEY')  # Update to match your environment variable name
+ALPACA_SECRET_KEY = os.environ.get('SECRET_KEY')  # Update to match your environment variable name
 
-# Access the environment variables
-ALPACA_API_KEY = os.getenv('ALPACA_API_KEY')
-ALPACA_SECRET_KEY = os.getenv('ALPACA_SECRET_KEY')
-API_BASE_URL = os.getenv('ALPACA_API_URL')
+# Update the base URL for live trading
+API_BASE_URL = "https://api.alpaca.markets"
 
-# Initialize the Alpaca API
+# Initialize Alpaca API
 alpaca = REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, API_BASE_URL)
 
-api = tradeapi.REST(
-    os.getenv('ALPACA_API_KEY'),
-    os.getenv('ALPACA_SECRET_KEY'),
-    'https://paper-api.alpaca.markets',
-    api_version='v2'
-)
+if ALPACA_API_KEY is None or ALPACA_SECRET_KEY is None:
+    raise ValueError("API keys are not set in the environment variables.")
 
 
 
