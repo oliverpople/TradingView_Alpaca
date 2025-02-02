@@ -100,14 +100,12 @@ def fetch_data(tickers, period, interval):
             
             if not df.empty:
                 try:
-                    # Convert the timezone-aware index to UTC, then convert to naive datetime
-                    df.index = df.index.tz_convert('UTC').tz_localize(None)
+                    # Keep only the Close column and convert to float32
+                    df = df[['Close']].astype('float32').copy()
                     
                     # Log the time range of data
                     logging.info(f"{alpaca_ticker} data range: {df.index[0]} to {df.index[-1]}")
                     
-                    # Only keep necessary columns and convert to float32 for memory efficiency
-                    df = df[['Close']].astype('float32').copy()
                     data[alpaca_ticker] = df
                     logging.info(f"Successfully processed data for {alpaca_ticker}")
                 except Exception as e:
