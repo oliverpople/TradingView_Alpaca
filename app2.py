@@ -100,6 +100,14 @@ def fetch_data(tickers, period, interval):
             
             if not df.empty:
                 try:
+                    # Ensure the index is a DatetimeIndex
+                    if not isinstance(df.index, pd.DatetimeIndex):
+                        df.index = pd.to_datetime(df.index)
+                    
+                    # Localize the index to UTC if it's not already timezone-aware
+                    if df.index.tz is None:
+                        df.index = df.index.tz_localize('UTC')
+                    
                     # Keep only the Close column and convert to float32
                     df = df[['Close']].astype('float32').copy()
                     
