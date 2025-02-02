@@ -88,31 +88,40 @@ def fetch_data(tickers, period, interval):
             yf_ticker = get_yfinance_ticker(alpaca_ticker)
             logging.info(f"Fetching data for {alpaca_ticker} (yFinance: {yf_ticker})")
             
-            # Download data in smaller chunks if possible
-            df = yf.download(yf_ticker, period=period, interval=interval, progress=False)
+            # Download data with threading disabled
+            df = yf.download(
+                yf_ticker, 
+                period=period, 
+                interval=interval, 
+                progress=False, 
+                threads=False  # Disable threading
+            )
             
             if not df.empty:
                 try:
-                    # Handle timezone-aware indexing
-                    if not df.index.tzinfo:
-                        df.index = pd.to_datetime(df.index, utc=True)
-                except Exception as tz_error:
-                    logging.warning(f"Timezone conversion failed for {alpaca_ticker}: {tz_error}")
-                    # If timezone conversion fails, create a new timezone-aware index
-                    df.index = pd.date_range(
+                    # Convert index to datetime if it isn't already
+                    df.index = pd.to_datetime(df.index)
+                    
+                    # Create a new timezone-aware index
+                    new_index = pd.date_range(
                         start=df.index[0],
                         end=df.index[-1],
                         periods=len(df.index),
                         tz='UTC'
                     )
-                
-                # Log the time range of data
-                logging.info(f"{alpaca_ticker} data range: {df.index[0]} to {df.index[-1]}")
-                
-                # Only keep necessary columns and convert to float32 for memory efficiency
-                df = df[['Close']].astype('float32').copy()
-                data[alpaca_ticker] = df
-                logging.info(f"Successfully processed data for {alpaca_ticker}")
+                    
+                    # Assign the new index
+                    df.index = new_index
+                    
+                    # Log the time range of data
+                    logging.info(f"{alpaca_ticker} data range: {df.index[0]} to {df.index[-1]}")
+                    
+                    # Only keep necessary columns and convert to float32 for memory efficiency
+                    df = df[['Close']].astype('float32').copy()
+                    data[alpaca_ticker] = df
+                    logging.info(f"Successfully processed data for {alpaca_ticker}")
+                except Exception as tz_error:
+                    logging.error(f"Error processing data for {alpaca_ticker}: {tz_error}")
             else:
                 logging.warning(f"Empty data received for {alpaca_ticker}")
             
