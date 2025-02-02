@@ -100,8 +100,8 @@ def fetch_data(tickers, period, interval):
             
             if not df.empty:
                 try:
-                    # Convert to simple datetime index without timezone info
-                    df.index = pd.to_datetime(df.index.astype(str))
+                    # Convert the timezone-aware index to UTC, then convert to naive datetime
+                    df.index = df.index.tz_convert('UTC').tz_localize(None)
                     
                     # Log the time range of data
                     logging.info(f"{alpaca_ticker} data range: {df.index[0]} to {df.index[-1]}")
