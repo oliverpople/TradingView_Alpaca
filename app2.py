@@ -52,30 +52,6 @@ except Exception as e:
     raise
 
 # Define tickers in Alpaca syntax
-# tickers = [
-    #etfs
-#     'QQQ', 'UUP', 'USO', 'XLV', 'XLP', 'XLE', 'XLF', 'XLI', 'XLB', 'XLK', 'XBI', 'XLU', 'XME', 'GDX', 'XOP',
-#  'XHB', 'XRT', 'TLT', 'FDN', 'FEZ', 'DBA', 'IEF', 'DXJ', 'ITB', 'SPY', 'LQD', 'XLY', 'HYG', 'KWEB', 'FXI',
-#  'EEM', 'DIA', 'IBB', 'IYT', 'EWZ', 'IWN', 'XLRE', 'URA', 'OIH', 'KBE', 'KRE', 'UVXY'
-    
-#   'SPY'
-#   'BTCUSD', 'ETHUSD', 'LTCUSD', 'BCHUSD', 'SOLUSD', 'DOTUSD', 
-#     'MATICUSD', 'LINKUSD', 'UNIUSD', 'DOGEUSD', 'AAVEUSD', 
-#     'USDBTC', 'USDETH', 'USDLTC', 'USDBCH', 'USDSOL', 'USDDOT',
-
-#     'ATOMUSD', 'AVAXUSD', 'ADAUSD', 'BNBUSD', 'SHIBUSD', 
-#     'XLMUSD', 'XRPUSD', 'XTZUSD', 'ALGOUSD', 'MANAUSD', 'SANDUSD'
-    
-    
-    # 'QQQ', 'UUP', 'USO', 'XLV', 'XLP', 'XLE', 'XLF', 'XLI', 'XLB', 'XLK', 'XBI', 'XLU', 'XME', 'GDX', 'XOP',
-    #        'XHB', 'XRT', 'TLT', 'FDN', 'FEZ', 'DBA', 'IEF', 'DXJ', 'ITB', 'SPY', 'LQD', 'XLY', 'HYG', 'KWEB', 'FXI',
-    #        'EEM', 'DIA', 'IBB', 'IYT', 'EWZ', 'IWN', 'XLRE', 'URA', 'OIH', 'KBE', 'KRE', 'AAPL', 'MSFT', 'AMZN',
-    #        'GOOGL', 'META', 'NVDA', 'BRK-B', 'TSLA', 'UNH', 'JNJ', 'V', 'XOM', 'PG', 'MA', 'LLY', 'JPM', 'HD',
-    #        'CVX', 'MRK', 'PEP', 'ABBV', 'KO', 'AVGO', 'COST', 'PFE', 'TMO', 'MCD', 'WMT', 'CSCO', 'ACN', 'ADBE', 'DHR',
-    #        'LIN', 'NFLX', 'NEE', 'ABT', 'RTX', 'TXN', 'CRM', 'NKE', 'INTC', 'ORCL', 'MS', 'PM', 'MDT', 'SCHW', 'IBM',
-    #        'HON', 'AMGN', 'LMT'
-# ]
-
 tickers = [
    'BTCUSD', 'ETHUSD', 'LTCUSD', 'BCHUSD', 'SOLUSD', 'DOTUSD', 
     'MATICUSD', 'LINKUSD', 'UNIUSD', 'DOGEUSD', 'AAVEUSD', 
@@ -83,61 +59,20 @@ tickers = [
 
     'ATOMUSD', 'AVAXUSD', 'ADAUSD', 'BNBUSD', 'SHIBUSD', 
     'XLMUSD', 'XRPUSD', 'XTZUSD', 'ALGOUSD', 'MANAUSD', 'SANDUSD'
+]
 
-  # Broad Market
-  # 'QQQ', 'SPY', 'DIA', 'IWN', 'EEM', 'FXI', 'KWEB', 'EWZ', 'FEZ', 'ACWI',
-  
-  # # Sectors
-  # 'XLV', 'XLP', 'XLE', 'XLF', 'XLK', 'XLI', 'XLB', 'XLY', 'XLU', 'XLRE',
-  
-  # # Industries
-  # 'XBI', 'XME', 'GDX', 'XOP', 'URA', 'KBE', 'KRE', 'OIH', 'XHB', 'ITB', 'IYT',
-  
-  # # Commodities
-  # 'USO', 'DBA', 'GLD', 'SLV', 'PICK', 'WOOD', 'REMX',
-  
-  # # Bonds and Fixed Income
-  # 'TLT', 'IEF', 'LQD', 'HYG', 'TIP', 'BNDX',
-  
-  # # Thematic
-  # 'FDN', 'ARKK', 'TAN', 'PBW', 'ROBO',
-  
-  # # Alternative Investments
-  # 'PFF', 'PSP',
-  
-  # # Regional
-  # 'VEA', 'VWO', 'SCZ', 'EWJ', 'INDA', 'EWA',
-  
-  # # Strategy
-  # 'MTUM', 'QUAL', 'VLUE', 'RSP',
-  
-  # # Volatility
-  # 'UVXY',
-  
-  # # Currency
-  # 'UUP', 'CYB',
-  
-  # # Inverse ETFs (most liquid and paired with the above ETFs)
-  # 'SQQQ', # ProShares UltraPro Short QQQ (pairs with QQQ)
-  # 'SH',   # ProShares Short S&P500 (pairs with SPY)
-  # 'DOG',  # ProShares Short Dow30 (pairs with DIA)
-  # 'RWM',  # ProShares Short Russell2000 (pairs with IWN)
-  # 'YXI',  # ProShares Short FTSE China 50 (pairs with FXI)
-  # 'EDZ',  # Direxion Emerging Markets Bear 3x Shares (pairs with EEM)
-  # 'DRV',  # Direxion Daily Real Estate Bear 3x Shares (pairs with XLRE)
-  # 'ERY',  # Direxion Daily Energy Bear 3x Shares (pairs with XLE)
-  # 'FAZ',  # Direxion Daily Financial Bear 3x Shares (pairs with XLF)
-  # 'SOXS', # Direxion Daily Semiconductor Bear 3x Shares (pairs with XLK)
-  # 'DUST', # Direxion Daily Gold Miners Bear 2x Shares (pairs with GDX)
-  # 'SCO',  # ProShares UltraShort Bloomberg Crude Oil (pairs with USO)
-  # 'TBT',  # ProShares UltraShort 20+ Year Treasury (pairs with TLT)
-];
-
-# Map tickers to yFinance syntax
-# ticker_map = {ticker: ticker.replace("USD", "-USD") for ticker in tickers}
-# ticker_map = {ticker: ticker.replace("", "") for ticker in tickers}
-ticker_map = {ticker: ticker for ticker in tickers}
-
+# Map Alpaca tickers to yFinance syntax
+def get_yfinance_ticker(alpaca_ticker):
+    """Convert Alpaca ticker format to yFinance format"""
+    # For crypto pairs ending in USD
+    if alpaca_ticker.endswith('USD'):
+        base = alpaca_ticker[:-3]  # Remove 'USD'
+        return f"{base}-USD"  # yFinance uses BTC-USD format
+    # For crypto pairs starting with USD
+    elif alpaca_ticker.startswith('USD'):
+        quote = alpaca_ticker[3:]  # Remove 'USD'
+        return f"{quote}-USD"  # Convert to standard format
+    return alpaca_ticker  # Return as is if no conversion needed
 
 def fetch_data(tickers, period, interval):
     current_time = datetime.now()
@@ -150,7 +85,9 @@ def fetch_data(tickers, period, interval):
     
     for alpaca_ticker in tickers:
         try:
-            yf_ticker = ticker_map.get(alpaca_ticker, alpaca_ticker)
+            yf_ticker = get_yfinance_ticker(alpaca_ticker)
+            logging.info(f"Fetching data for {alpaca_ticker} (yFinance: {yf_ticker})")
+            
             # Download data in smaller chunks if possible
             df = yf.download(yf_ticker, period=period, interval=interval)
             
@@ -170,6 +107,7 @@ def fetch_data(tickers, period, interval):
             gc.collect()  # Force garbage collection after each ticker
         except Exception as e:
             logging.error(f"Error fetching data for {alpaca_ticker}: {e}")
+            continue
     return data
 
 
