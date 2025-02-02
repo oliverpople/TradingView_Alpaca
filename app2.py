@@ -89,25 +89,44 @@ def fetch_data(tickers, period, interval):
             logging.info(f"Fetching data for {alpaca_ticker} (yFinance: {yf_ticker})")
             
             # Download data in smaller chunks if possible
-            df = yf.download(yf_ticker, period=period, interval=interval)
+            df = yf.download(yf_ticker, period=period, interval=interval, progress=False)
             
             if not df.empty:
+                try:
+                    # Handle timezone-aware indexing
+                    if not df.index.tzinfo:
+                        df.index = pd.to_datetime(df.index, utc=True)
+                except Exception as tz_error:
+                    logging.warning(f"Timezone conversion failed for {alpaca_ticker}: {tz_error}")
+                    # If timezone conversion fails, create a new timezone-aware index
+                    df.index = pd.date_range(
+                        start=df.index[0],
+                        end=df.index[-1],
+                        periods=len(df.index),
+                        tz='UTC'
+                    )
+                
                 # Log the time range of data
                 logging.info(f"{alpaca_ticker} data range: {df.index[0]} to {df.index[-1]}")
                 
                 # Only keep necessary columns and convert to float32 for memory efficiency
                 df = df[['Close']].astype('float32').copy()
                 data[alpaca_ticker] = df
-                print(f"Fetched data for {alpaca_ticker}")
+                logging.info(f"Successfully processed data for {alpaca_ticker}")
             else:
                 logging.warning(f"Empty data received for {alpaca_ticker}")
             
             # Explicitly delete the DataFrame to free memory
             del df
             gc.collect()  # Force garbage collection after each ticker
+            
         except Exception as e:
             logging.error(f"Error fetching data for {alpaca_ticker}: {e}")
             continue
+            
+        # Add a small delay between requests to avoid rate limiting
+        time.sleep(0.1)
+    
     return data
 
 
