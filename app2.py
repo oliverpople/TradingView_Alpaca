@@ -16,22 +16,40 @@ from alpaca_trade_api import REST
 import time
 import os
 
+# Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 warnings.filterwarnings('ignore')
-# Use environment variables
-ALPACA_API_KEY = os.environ.get('PUBLIC_KEY')  # Update to match your environment variable name
-ALPACA_SECRET_KEY = os.environ.get('SECRET_KEY')  # Update to match your environment variable name
 
-# Update the base URL for live trading
-API_BASE_URL = "https://api.alpaca.markets"
+# Initialize environment variables with proper error handling
+try:
+    # Get API credentials from environment variables
+    APCA_API_KEY_ID = os.getenv('APCA_API_KEY_ID')
+    APCA_API_SECRET_KEY = os.getenv('APCA_API_SECRET_KEY')
+    ALPACA_API_URL = os.getenv('ALPACA_API_URL', 'https://paper-api.alpaca.markets')  # Default to paper trading URL
 
-# Initialize Alpaca API
-alpaca = REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, API_BASE_URL)
+    # Log environment variable status (without exposing actual values)
+    logging.info("Checking environment variables...")
+    logging.info(f"APCA_API_KEY_ID present: {bool(APCA_API_KEY_ID)}")
+    logging.info(f"APCA_API_SECRET_KEY present: {bool(APCA_API_SECRET_KEY)}")
+    logging.info(f"ALPACA_API_URL: {ALPACA_API_URL}")
 
-if ALPACA_API_KEY is None or ALPACA_SECRET_KEY is None:
-    raise ValueError("API keys are not set in the environment variables.")
+    if not APCA_API_KEY_ID or not APCA_API_SECRET_KEY:
+        raise ValueError("Required API keys (APCA_API_KEY_ID, APCA_API_SECRET_KEY) are not set in environment variables")
 
+    # Initialize Alpaca API client
+    alpaca = REST(
+        key_id=APCA_API_KEY_ID,
+        secret_key=APCA_API_SECRET_KEY,
+        base_url=ALPACA_API_URL
+    )
 
+    # Verify API connection
+    account = alpaca.get_account()
+    logging.info(f"Successfully connected to Alpaca API. Account status: {account.status}")
+
+except Exception as e:
+    logging.error(f"Error initializing Alpaca API: {str(e)}")
+    raise
 
 # Define tickers in Alpaca syntax
 # tickers = [
